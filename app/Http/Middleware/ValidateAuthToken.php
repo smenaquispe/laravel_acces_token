@@ -12,7 +12,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ValidateAuthToken
 {
-   
     public function handle(Request $request, Closure $next)
     {
         $token = $request->bearerToken();
