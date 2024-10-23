@@ -4,52 +4,37 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Firebase\JWT\JWT;
-use Firebase\JWT\JWK;
-use Firebase\JWT\ExpiredException;
-use Firebase\JWT\SignatureInvalidException;
-use Psy\Readline\Hoa\Console;
+use Auth0\SDK\Auth0;
+use Auth0\SDK\Configuration\SdkConfiguration;
+use Auth0\SDK\Token;
+use Symfony\Component\HttpFoundation\Response;
+
 
 class ValidateAuthToken
 {
    
     public function handle(Request $request, Closure $next)
     {
-        // Obtener el token del encabezado Authorization
-        $authHeader = $request->header('Authorization');
-        if (!$authHeader) {
-            return response()->json(['error' => 'Authorization header not found.'], 401);
+        $token = $request->bearerToken();
+        if (!$token) {
+            return response()->json(['error' => 'Token not provided'], Response::HTTP_UNAUTHORIZED);
         }
 
-        // Eliminar "Bearer " del encabezado
-        $jwt = str_replace('Bearer ', '', $authHeader);
-
-        // Configura el dominio de Auth0
-        $auth0Domain = env('AUTH0_DOMAIN');
-
-        // Obtener las claves JWK
-        $jwksUrl = "https://{$auth0Domain}/.well-known/jwks.json";
-        $jwks = json_decode(file_get_contents($jwksUrl), true);
-
+        $config = new SdkConfiguration(
+            strategy: SdkConfiguration::STRATEGY_API,
+            domain: env('AUTH0_DOMAIN'),
+            audience: [env('AUTH0_AUDIENCE')],
+            tokenJwksUri: env('AUTH0_TOKEN_JWKS_URI'),
+        );
+        
         try {
-            // Obtener la clave de firma del JWK
-            $key = JWK::parseKey($jwks['keys'][0]);
-
-            // Decodificar y verificar el JWT
-            $decoded = JWT::decode($jwt, $key);
-
-            // Almacena el token decodificado en el request para uso posterior
-            $request->attributes->add(['decoded' => $decoded]);
-
+            $auth0 = new Auth0($config);
+            $auth0->decode($token, tokenType: Token::TYPE_ACCESS_TOKEN);
+            
             return $next($request);
-        } catch (ExpiredException $e) {
-            return response()->json(['error' => 'Token has expired.'], 401);
-        } catch (SignatureInvalidException $e) {
-            return response()->json(['error' => 'Invalid token.'], 401);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Token could not be parsed.'], 401);
+            return response()->json(['error' => 'Invalid token: ' . $e->getMessage()], Response::HTTP_UNAUTHORIZED);
         }
-   
     }
 
 }

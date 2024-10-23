@@ -19,7 +19,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::middleware('token')->group(function () {
-    Route::get('/protected-route', function () {
+    Route::get('/protected', function () {
         return response()->json(['message' => 'Esta es una ruta protegida']);
     });
 });
